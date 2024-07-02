@@ -1,10 +1,15 @@
 {
-  lib,
+  bash,
   buildGoModule,
   fetchFromGitHub,
   installShellFiles,
+  lib,
+  makeBinaryWrapper,
+  nix-update-script,
+  restic,
+  resticprofile,
+  testers,
 }:
-
 buildGoModule rec {
   pname = "resticprofile";
   version = "0.26.0";
@@ -24,7 +29,10 @@ buildGoModule rec {
     "-X main.builtBy=nixpkgs"
   ];
 
-  nativeBuildInputs = [ installShellFiles ];
+  nativeBuildInputs = [
+    installShellFiles
+    makeBinaryWrapper
+  ];
 
   preCheck = ''
     rm battery_test.go # tries to get battery data
@@ -52,6 +60,24 @@ buildGoModule rec {
 
     runHook postInstall
   '';
+
+  postInstall = ''
+    wrapProgram $out/bin/resticprofile \
+      --prefix PATH : "${
+        lib.makeBinPath [
+          restic
+          bash
+        ]
+      }"
+  '';
+
+  passthru = {
+    updateScript = nix-update-script { };
+    tests.version = testers.testVersion {
+      package = resticprofile;
+      command = "resticprofile version";
+    };
+  };
 
   meta = {
     changelog = "https://github.com/creativeprojects/resticprofile/releases/tag/${src.rev}";
